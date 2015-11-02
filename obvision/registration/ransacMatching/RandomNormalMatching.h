@@ -110,6 +110,9 @@ private:
   // pick control set for RANSAC in-/outlier detection
   obvious::Matrix* pickControlSet(const obvious::Matrix* M, vector<unsigned int> idxValid, vector<unsigned int> &idxControl);
 
+  std::vector<double> _anglesModel;
+  std::vector<double> _distModel;
+
   // squared distance threshold
   double _scaleDistance;
 

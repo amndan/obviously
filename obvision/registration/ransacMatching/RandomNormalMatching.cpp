@@ -536,6 +536,305 @@ obvious::Matrix RandomNormalMatching::match(const obvious::Matrix* M,
 	return TBest;
 }
 
+obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
+		const bool* maskM, const obvious::Matrix* NM, const obvious::Matrix* S,
+		const bool* maskS, double phiMax, const double transMax,
+		const double resolution) {
+	obvious::Matrix TBest(3, 3);
+	TBest.setIdentity();
+
+	const int pointsInM = M->getRows();
+	const int pointsInS = S->getRows();
+
+	if (pointsInM != pointsInS) {
+		LOGMSG(DBG_ERROR,
+				"Model and scene need to be of same size, size of M: " << pointsInM << ", size of S: " << pointsInS);
+		return TBest;
+	}
+
+	if (pointsInM < 3) {
+		LOGMSG(DBG_ERROR,
+				"Model and scene contain too less points, size of M: " << pointsInM << ", size of S: " << pointsInS);
+		return TBest;
+	}
+
+	// ----------------- Model ------------------
+	obvious::Matrix* NMpca = new Matrix(pointsInM, 2); // Normals for model
+	double* phiM = new double[pointsInM];    // Orientation of model points
+	bool* maskMpca = new bool[pointsInM];      // Validity mask of model points
+
+	memcpy(maskMpca, maskM, pointsInM * sizeof(bool));
+
+	if (NM) {
+		calcPhi(NM, maskM, phiM);
+	} else // if normals are not supplied
+	{
+		calcNormals(M, NMpca, maskM, maskMpca);
+		calcPhi(NMpca, maskMpca, phiM);
+	}
+	vector<unsigned int> idxMValid = extractSamples(M, maskMpca);
+
+#if USEKNN
+	initKDTree(M, idxMValid);
+#endif
+	// -------------------------------------------
+
+	// ----------------- Scene -------------------
+	obvious::Matrix* NSpca = new Matrix(pointsInS, 2); // Normals for scene
+	double* phiS = new double[pointsInS];    // Orientation of scene points
+	bool* maskSpca = new bool[pointsInS];      // Validity mask of scene points
+	memcpy(maskSpca, maskS, pointsInS * sizeof(bool));
+
+	// Determine number of valid samples in local scene neighborhood
+	// only from these points a valid orientation is computable
+	unsigned int validPoints = 0;
+	for (int i = 0; i < pointsInS; i++)
+		if (maskSpca[i])
+			validPoints++;
+
+	// Probability of point masking
+	double probability = 180.0 / (double) validPoints;
+	if (probability < 0.99)
+		subsampleMask(maskSpca, pointsInS, probability);
+
+	calcNormals(S, NSpca, maskS, maskSpca);
+	calcPhi(NSpca, maskSpca, phiS);
+
+	vector<unsigned int> idxSValid = extractSamples(S, maskSpca);
+	// -------------------------------------------
+
+	// --------------- Control set ---------------
+	vector<unsigned int> idxControl; //represents the indices of points used for Control in S.
+	obvious::Matrix* Control = pickControlSet(S, idxSValid, idxControl);
+	obvious::Matrix* NControl = new obvious::Matrix(idxControl.size(), 2);
+	for (unsigned int i = 0; i < Control->getCols(); i++) {
+		(*NControl)(i, 0) = (*NSpca)(idxControl[i], 0);
+		(*NControl)(i, 1) = (*NSpca)(idxControl[i], 1);
+	}
+	unsigned int pointsInC = Control->getCols();
+	unsigned int cntMatchThresh = pointsInC / 3; // TODO: Determine meaningful parameter
+	double* phiControl = new double[pointsInC]; // Orientation of control points
+	calcPhi(NControl, NULL, phiControl);
+	// -------------------------------------------//
+
+	// Determine frustum, i.e., direction of leftmost and rightmost model point
+	double thetaMin = -((double) pointsInM - 1.0) / 2.0 * resolution; // theoretical bounding
+	double thetaBoundMin = atan2((*M)(idxMValid.front(), 1),
+			(*M)(idxMValid.front(), 0)); // real bounding
+	double thetaBoundMax = atan2((*M)(idxMValid.back(), 1),
+			(*M)(idxMValid.back(), 0));  // real bounding
+
+	LOGMSG(DBG_DEBUG,
+			"Valid points in scene: " << idxSValid.size() << ", valid points in model: " << idxMValid.size() << ", Control set: " << Control->getCols());
+	LOGMSG(DBG_DEBUG,
+			"Model phi min:: " << rad2deg(thetaBoundMin) << ", Model phi max: " << rad2deg(thetaBoundMax));
+
+	if (idxSValid.size() < 3) {
+		LOGMSG(DBG_ERROR,
+				"Too less valid points in scene, matchable size: " << idxSValid.size());
+		return TBest;
+	}
+
+	if (idxMValid.size() < 3) {
+		LOGMSG(DBG_ERROR,
+				"Too less valid points in model, matchable size: " << idxMValid.size());
+		return TBest;
+	}
+
+	// Check for maximum meaningful trials
+	unsigned int trials = _trials;
+	if (idxMValid.size() < _trials)
+		trials = idxMValid.size();
+
+	if (_trace) {
+		_trace->reset();
+		_trace->setModel(M, idxMValid);
+		_trace->setScene(S, idxSValid);
+	}
+
+	// Calculate search "radius", i.e., maximum difference in polar indices because of rotation
+	phiMax = min(phiMax, M_PI * 0.5);
+	int span;
+	if (resolution > 1e-6) {
+		span = floor(phiMax / resolution);
+		if (span > (int) pointsInM)
+			span = (int) pointsInM;
+	} else {
+		LOGMSG(DBG_ERROR,
+				"Resolution not properly set: resolution = " << resolution);
+		return TBest;
+	}
+
+	srand(time(NULL));
+
+	double bestRatio = 0.0;
+	unsigned int bestCnt = 0;
+	double bestErr = 1e12;
+
+#ifndef DEBUG
+	// trace is only possible for single threaded execution
+	if (_trace) {
+		omp_set_num_threads(1);
+		LOGMSG(DBG_WARN,
+				"Configured single-threaded execution due to application of trace module");
+	}
+#endif
+
+//Timer t;
+//t.start();
+	vector<unsigned int> idxTrials = idxMValid;
+
+	bool* maskControl = new bool[pointsInC];
+	double* thetaControl = new double[pointsInC];
+
+	// ToDo: create angle array from model
+
+	for(unsigned int i = 0; i < idxMValid.size(); i++){
+		//double phi;
+		_anglesModel.push_back(atan2((*M)(idxMValid[i], 0), (*M)(idxMValid[i], 1)));
+		_distModel.push_back(sqrt( ((*M)(idxMValid[i], 0)) * ((*M)(idxMValid[i], 0)) + ((*M)(idxMValid[i],1)) * ((*M)(idxMValid[i],1)) ));
+		cout << "Angle: " << _anglesModel[i] << ", Distance: " << _distModel[i] << endl;
+		//cout << "x: " << (*M)(idxMValid[i], 0) << ", y: " << (*M)(idxMValid[i], 1) << ", phi: " << phi * 180.0 / M_PI << endl;
+	}
+
+
+	for (unsigned int trial = 0; trial < trials; trial++) {
+
+		int idx;
+#pragma omp critical
+		{
+			const int randIdx = rand() % (idxTrials.size());
+			idx = idxTrials[randIdx];
+
+			// remove chosen element to avoid picking same index a second time
+			idxTrials.erase(idxTrials.begin() + randIdx);
+		}
+
+		// leftmost scene point
+		const int iMin = max(idx - span, _pcaSearchRange / 2);
+		// rightmost scene point
+		const int iMax = min(idx + span, pointsInS - _pcaSearchRange / 2);
+
+		for (int i = iMin; i < iMax; i++) {
+#if STRUCTAPPROACH
+			if(samplesS[i].valid)
+#else
+			if (maskSpca[i])
+#endif
+			{
+
+#if STRUCTAPPROACH
+				double phi = samplesM[idx].orientation - samplesS[i].orientation;
+#else
+				double phi = phiM[idx] - phiS[i];
+#endif
+				if (phi > M_PI)
+					phi -= 2.0 * M_PI;
+				else if (phi < -M_PI)
+					phi += 2.0 * M_PI;
+
+				if (fabs(phi) < phiMax) {
+					obvious::Matrix T =
+							obvious::MatrixFactory::TransformationMatrix33(phi,
+									0, 0);
+
+					// Calculate translation
+					const double sx = (*S)(i, 0);
+					const double sy = (*S)(i, 1);
+					T(0, 2) = (*M)(idx, 0) - (T(0, 0) * sx + T(0, 1) * sy);
+					T(1, 2) = (*M)(idx, 1) - (T(1, 0) * sx + T(1, 1) * sy);
+
+					// Transform control set
+					obvious::Matrix STemp = T * (*Control);
+					unsigned int pointsInControl = STemp.getCols();
+
+					// Determine number of control points in field of view
+					unsigned int maxCntMatch = 0;
+					for (unsigned int j = 0; j < pointsInControl; j++) {
+						thetaControl[j] = atan2(STemp(1, j), STemp(0, j));
+						if (thetaControl[j] > thetaBoundMax
+								|| thetaControl[j] < thetaBoundMin) {
+							maskControl[j] = false;
+						} else {
+							maskControl[j] = true;
+							maxCntMatch++;
+						}
+					}
+
+					// Determine how many nearest neighbors (model <-> scene) are close enough
+					unsigned int cntMatch = 0;
+					flann::Matrix<int> indices(new int[1], 1, 1);
+					flann::Matrix<double> dists(new double[1], 1, 1);
+					double errSum = 0;
+					//double scoreSum = 0.0;
+
+				    unsigned int matches = 0;
+					for (unsigned int s = 0; s < pointsInControl; s++) {
+						// clip points outside of model frustum
+						if (maskControl[s]) {
+
+							double angle = atan2((STemp)(1, s), (STemp)(0, s));
+							double distance = sqrt( ((STemp)(0, s)) * ((STemp)(0, s)) + ((STemp)(1, s)) * ((STemp)(1, s)) );
+
+							unsigned dani = 0;
+							while( abs((angle) - _anglesModel[dani]) > 0.1 && dani < _anglesModel.size()) {
+								//cout << "Dani: " << dani << "Angle Model: " << _anglesModel[dani] << ", Angle Scene: " << angle << endl;
+								//cout << "Distance Model: " << _distModel[dani] << ", Distance Scene: " << distance << endl;
+								//TODO i am not silly
+								dani++;
+							}
+
+							if (dani == _anglesModel.size()) {
+								//cout << "Hilfe" << endl;
+							} else{
+								if( abs (distance - _distModel[dani]) < 0.5) {
+									matches++;
+								}
+								//cout << "Dani: " << dani << "Angle Model: " << _anglesModel[dani] << ", Angle Scene: " << angle << endl;
+							}
+
+						}
+					}
+					cout << "ScencePoint: " << i << ", Matches: " << matches << endl;
+
+					delete[] indices.ptr();
+					delete[] dists.ptr();
+
+					if (_trace) {
+						//trace is only possible for single threaded execution
+						vector<unsigned int> idxM;
+						idxM.push_back(idx);
+						vector<unsigned int> idxS;
+						idxS.push_back(i);
+						_trace->addAssignment(M, idxM, S, idxS, &STemp, errSum,
+								trial);
+					}
+
+				}                // if phiMax
+			} // if maskS
+		} // for i
+	} // for trials
+
+	delete[] maskControl;
+
+	//cout << "elapsed: " << t.elapsed() << endl;
+	//t.reset();
+
+	delete NMpca;
+	delete NSpca;
+	delete[] phiM;
+	delete[] phiS;
+	delete[] phiControl;
+	delete[] maskMpca;
+	delete[] maskSpca;
+
+	delete Control;
+
+	TBest = obvious::MatrixFactory::TransformationMatrix33(0, 0, 0);
+
+	return TBest;
+}
+
 void RandomNormalMatching::serializeTrace(const char* folder) {
 	if (_trace)
 		_trace->serialize(folder);
