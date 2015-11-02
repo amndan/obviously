@@ -63,6 +63,27 @@ public:
                         const double transMax = 1.5,
                         const double resolution = 0.0);
 
+	/**
+	 * Matching method
+	 * @param M Matrix for model points. Points are accessed by rows. e.g. x = M(p, 0) y= M(p,1)
+	 * @param maskM Mask for matrix M. Valid points are identified with true-value. It has the same size as M.getCols()
+	 * @param NM Matrix with normals for model data set
+	 * @param S Matrix for scene points
+	 * @param maskS Mask for matrix S
+	 * @param phiMax Maximum allowed rotation as output
+	 * @param transMax Maximum allowed translation
+	 * @param resolution Angular resolution of the laser scan
+	 * @return 3x3 registration matrix
+	 */
+	obvious::Matrix match2(const obvious::Matrix* M,
+						  const bool* maskM,
+						  const obvious::Matrix* NM,
+						  const obvious::Matrix* S,
+						  const bool* maskS,
+						  double phiMax = M_PI / 4.0,
+						  const double transMax = 1.5,
+						  const double resolution = 0.0);
+
   /**
    * Serialize assignment to trace folder
    * @param folder trace folder (must not be existent)
