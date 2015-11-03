@@ -26,6 +26,20 @@ RandomNormalMatching::RandomNormalMatching(unsigned int trials,
 	_trace = NULL;
 	_pcaSearchRange = 10;
 	_pcaMinSamples = 3;
+
+	_zhit = 0.45;
+	_zshort = 0.25;
+	_zmax = 0.05;
+	_zrand = 0.25;
+
+	_phit = 0;
+	_pshort = 0;
+	_pmax = 0;
+	_prand = 0;
+
+	_rangemax = 20;
+	_sighit = 0.4;
+	_lamshort = 0.08;
 }
 
 RandomNormalMatching::~RandomNormalMatching() {
@@ -612,7 +626,7 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 		(*NControl)(i, 1) = (*NSpca)(idxControl[i], 1);
 	}
 	unsigned int pointsInC = Control->getCols();
-	unsigned int cntMatchThresh = pointsInC / 3; // TODO: Determine meaningful parameter
+	unsigned int cntMatchThresh = pointsInC * 0.8; // TODO: Determine meaningful parameter
 	double* phiControl = new double[pointsInC]; // Orientation of control points
 	calcPhi(NControl, NULL, phiControl);
 	// -------------------------------------------//
@@ -669,7 +683,7 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 
 	double bestRatio = 0.0;
 	unsigned int bestCnt = 0;
-	double bestErr = 1e12;
+	double bestErr = 1e-200;
 
 #ifndef DEBUG
 	// trace is only possible for single threaded execution
@@ -689,12 +703,13 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 
 	// ToDo: create angle array from model
 
+	std::vector<double> anglesModel;
+	std::vector<double> distModel;
+
 	for(unsigned int i = 0; i < idxMValid.size(); i++){
 		//double phi;
-		_anglesModel.push_back(atan2((*M)(idxMValid[i], 0), (*M)(idxMValid[i], 1)));
-		_distModel.push_back(sqrt( ((*M)(idxMValid[i], 0)) * ((*M)(idxMValid[i], 0)) + ((*M)(idxMValid[i],1)) * ((*M)(idxMValid[i],1)) ));
-		cout << "Angle: " << _anglesModel[i] << ", Distance: " << _distModel[i] << endl;
-		//cout << "x: " << (*M)(idxMValid[i], 0) << ", y: " << (*M)(idxMValid[i], 1) << ", phi: " << phi * 180.0 / M_PI << endl;
+		anglesModel.push_back(atan2((*M)(idxMValid[i], 1), (*M)(idxMValid[i], 0)));
+		distModel.push_back( sqrt( pow(((*M)(idxMValid[i], 0)), 2) + pow(((*M)(idxMValid[i],1)), 2) ) );
 	}
 
 
@@ -716,6 +731,7 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 		const int iMax = min(idx + span, pointsInS - _pcaSearchRange / 2);
 
 		for (int i = iMin; i < iMax; i++) {
+
 #if STRUCTAPPROACH
 			if(samplesS[i].valid)
 #else
@@ -739,6 +755,7 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 									0, 0);
 
 					// Calculate translation
+						// todo: dan: trying to use phi + dx, dy directly for transformation via rightsided multiplication!?
 					const double sx = (*S)(i, 0);
 					const double sy = (*S)(i, 1);
 					T(0, 2) = (*M)(idx, 0) - (T(0, 0) * sx + T(0, 1) * sy);
@@ -752,8 +769,7 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 					unsigned int maxCntMatch = 0;
 					for (unsigned int j = 0; j < pointsInControl; j++) {
 						thetaControl[j] = atan2(STemp(1, j), STemp(0, j));
-						if (thetaControl[j] > thetaBoundMax
-								|| thetaControl[j] < thetaBoundMin) {
+						if (thetaControl[j] > thetaBoundMax || thetaControl[j] < thetaBoundMin) {
 							maskControl[j] = false;
 						} else {
 							maskControl[j] = true;
@@ -761,57 +777,68 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 						}
 					}
 
-					// Determine how many nearest neighbors (model <-> scene) are close enough
-					unsigned int cntMatch = 0;
-					flann::Matrix<int> indices(new int[1], 1, 1);
-					flann::Matrix<double> dists(new double[1], 1, 1);
-					double errSum = 0;
-					//double scoreSum = 0.0;
+					std::vector<double> probOfSingleScans;
 
-				    unsigned int matches = 0;
-					for (unsigned int s = 0; s < pointsInControl; s++) {
-						// clip points outside of model frustum
-						if (maskControl[s]) {
+					if (maxCntMatch > cntMatchThresh){
 
-							double angle = atan2((STemp)(1, s), (STemp)(0, s));
-							double distance = sqrt( ((STemp)(0, s)) * ((STemp)(0, s)) + ((STemp)(1, s)) * ((STemp)(1, s)) );
+						// Rating dan_tob
+						for (unsigned int s = 0; s < pointsInControl; s++) { // whole control set
+							// clip points outside of model frustum
+							if (maskControl[s]) { // if point is in field of view
 
-							unsigned dani = 0;
-							while( abs((angle) - _anglesModel[dani]) > 0.1 && dani < _anglesModel.size()) {
-								//cout << "Dani: " << dani << "Angle Model: " << _anglesModel[dani] << ", Angle Scene: " << angle << endl;
-								//cout << "Distance Model: " << _distModel[dani] << ", Distance Scene: " << distance << endl;
-								//TODO i am not silly
-								dani++;
-							}
+								double angle = atan2((STemp)(1, s), (STemp)(0, s));
+								double distance = sqrt( ((STemp)(0, s)) * ((STemp)(0, s)) + ((STemp)(1, s)) * ((STemp)(1, s)) );
 
-							if (dani == _anglesModel.size()) {
-								//cout << "Hilfe" << endl;
-							} else{
-								if( abs (distance - _distModel[dani]) < 0.5) {
-									matches++;
+								double minAngleDiff = 2 * M_PI;
+								int idxMinAngleDiff;
+								double diff;
+
+								for(int i = 0; i < anglesModel.size(); i++){ // find right model point to control point
+									diff = abs(angle - anglesModel[i]);
+									if ( diff < minAngleDiff ){ // find min angle
+										minAngleDiff = diff;
+										idxMinAngleDiff = i;
+									}
 								}
-								//cout << "Dani: " << dani << "Angle Model: " << _anglesModel[dani] << ", Angle Scene: " << angle << endl;
-							}
 
+								//cout <<  "min angle " << minAngleDiff << endl;
+
+
+								double probOfSingleScan;
+								probOfSingleScan = probabilityOfTwoSingleScans(distModel[idxMinAngleDiff], distance);
+								probOfSingleScans.push_back(probOfSingleScan);
+
+								//cout << "angle model|scene: " << anglesModel[idxMinAngleDiff] * 180.0 / M_PI << " | " <<  angle * 180.0 / M_PI  <<
+								//		"; dist model|scene: " << distModel[idxMinAngleDiff] << " | " << distance << " prob: "<< probOfSingleScan << endl;
+
+							}// if point is in field of view
+						} // whole control set
+
+						double probOfActualScan = 1;
+
+						for(int i = 0; i < probOfSingleScans.size(); i++){
+							probOfActualScan = probOfActualScan * probOfSingleScans[i];
 						}
-					}
-					cout << "ScencePoint: " << i << ", Matches: " << matches << endl;
 
-					delete[] indices.ptr();
-					delete[] dists.ptr();
 
-					if (_trace) {
-						//trace is only possible for single threaded execution
-						vector<unsigned int> idxM;
-						idxM.push_back(idx);
-						vector<unsigned int> idxS;
-						idxS.push_back(i);
-						_trace->addAssignment(M, idxM, S, idxS, &STemp, errSum,
-								trial);
-					}
+						if(probOfActualScan > bestErr){
+							TBest = T;
+							bestErr = probOfActualScan;
+							//cout << "new errSum: " << probOfActualScan << " trial: " << trial << endl;
 
-				}                // if phiMax
-			} // if maskS
+							if (_trace) {
+								//trace is only possible for single threaded execution
+								vector<unsigned int> idxM;
+								idxM.push_back(idx);
+								vector<unsigned int> idxS;
+								idxS.push_back(i);
+								_trace->addAssignment(M, idxM, S, idxS, &STemp, 10e100 * probOfActualScan,
+										trial);
+							}
+						}
+					}// if phiMax
+				} // if maskS
+			}
 		} // for i
 	} // for trials
 
@@ -830,10 +857,35 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 
 	delete Control;
 
-	TBest = obvious::MatrixFactory::TransformationMatrix33(0, 0, 0);
-
 	return TBest;
 }
+
+double RandomNormalMatching::probabilityOfTwoSingleScans(double m, double s) {
+
+	// hit
+	if (s < _rangemax) {
+		_phit = (1) / (sqrt(2 * M_PI * pow(_sighit, 2))) * pow(M_E, ((-0.5 * pow((m - s), 2)) / (pow(_sighit, 2)))) ;
+	}
+
+	// short
+	if (s < m){
+	double n = (1)/(1 - pow(M_E, (-_lamshort * m)));
+	_pshort = n * _lamshort * pow(M_E, (-_lamshort * s)) ;
+	}
+
+	// max
+	if (s >= _rangemax){
+	_pmax = 1;
+	}
+
+	// rand
+	if (s < _rangemax){
+	_prand = 1 / _rangemax;
+	}
+
+	return _zhit * _phit + _zshort * _pshort + _zmax * _pmax + _zrand * _prand;
+}
+
 
 void RandomNormalMatching::serializeTrace(const char* folder) {
 	if (_trace)

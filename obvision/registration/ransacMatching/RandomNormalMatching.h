@@ -5,6 +5,7 @@
 #include "obcore/math/linalg/linalg.h"
 #include "obvision/registration/Trace.h"
 #include "obvision/registration/icp/PointToLineEstimator2D.h"
+#include <cmath>
 #include "omp.h"
 
 namespace obvious
@@ -84,6 +85,9 @@ public:
 						  const double transMax = 1.5,
 						  const double resolution = 0.0);
 
+
+	double probabilityOfTwoSingleScans(double m, double s);
+
   /**
    * Serialize assignment to trace folder
    * @param folder trace folder (must not be existent)
@@ -110,8 +114,20 @@ private:
   // pick control set for RANSAC in-/outlier detection
   obvious::Matrix* pickControlSet(const obvious::Matrix* M, vector<unsigned int> idxValid, vector<unsigned int> &idxControl);
 
-  std::vector<double> _anglesModel;
-  std::vector<double> _distModel;
+  // probability model variables
+  double _zhit;
+  double _zshort;
+  double _zmax;
+  double _zrand;
+
+  double _phit;
+  double _pshort;
+  double _pmax;
+  double _prand;
+
+  double _rangemax;
+  double _sighit;
+  double _lamshort;
 
   // squared distance threshold
   double _scaleDistance;
