@@ -27,18 +27,23 @@ RandomNormalMatching::RandomNormalMatching(unsigned int trials,
 	_pcaSearchRange = 10;
 	_pcaMinSamples = 3;
 
-	_zhit = 0.45;
-	_zshort = 0.25;
-	_zmax = 0.05;
-	_zrand = 0.25;
+	_percentagePointsInC = 0.9; // how many percent of control set have to be in field of view
 
+	// probability parameters vgl. Book: Probabistic Robotics
+	_zhit = 0.45;
+	_zmax = 0.05;
+	_zshort = 0.25;
+	_zrand = 0.25;
+	_zphi = 0; // additional parameter for phi error; not used at the moment
 	_phit = 0;
+	_pphi = 0;
 	_pshort = 0;
 	_pmax = 0;
 	_prand = 0;
 
 	_rangemax = 20;
-	_sighit = 0.4;
+	_sighit = 0.2;
+	_sigphi = M_PI / 180.0; // additional parameter for phi error; not used at the moment
 	_lamshort = 0.08;
 }
 
@@ -626,7 +631,7 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 		(*NControl)(i, 1) = (*NSpca)(idxControl[i], 1);
 	}
 	unsigned int pointsInC = Control->getCols();
-	unsigned int cntMatchThresh = pointsInC * 0.8; // TODO: Determine meaningful parameter
+	unsigned int cntMatchThresh = pointsInC * _percentagePointsInC; // TODO: Determine meaningful parameter
 	double* phiControl = new double[pointsInC]; // Orientation of control points
 	calcPhi(NControl, NULL, phiControl);
 	// -------------------------------------------//
@@ -683,7 +688,7 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 
 	double bestRatio = 0.0;
 	unsigned int bestCnt = 0;
-	double bestErr = 1e-200;
+	double bestProb = 0.0;
 
 #ifndef DEBUG
 	// trace is only possible for single threaded execution
@@ -707,9 +712,8 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 	std::vector<double> distModel;
 
 	for(unsigned int i = 0; i < idxMValid.size(); i++){
-		//double phi;
-		anglesModel.push_back(atan2((*M)(idxMValid[i], 1), (*M)(idxMValid[i], 0)));
-		distModel.push_back( sqrt( pow(((*M)(idxMValid[i], 0)), 2) + pow(((*M)(idxMValid[i],1)), 2) ) );
+		anglesModel.push_back(atan2((*M)(idxMValid[i], 1), (*M)(idxMValid[i], 0))); // store all available model angles
+		distModel.push_back( sqrt( pow(((*M)(idxMValid[i], 0)), 2) + pow(((*M)(idxMValid[i],1)), 2) ) ); // store distances to angles
 	}
 
 
@@ -765,6 +769,17 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 					obvious::Matrix STemp = T * (*Control);
 					unsigned int pointsInControl = STemp.getCols();
 
+//					if (_trace) {
+//						//trace is only possible for single threaded execution
+//						vector<unsigned int> idxM;
+//						idxM.push_back(idx);
+//						vector<unsigned int> idxS;
+//						idxS.push_back(i);
+//						_trace->addAssignment(M, idxM, S, idxS, &STemp, 0,
+//								trial);
+//					}
+
+
 					// Determine number of control points in field of view
 					unsigned int maxCntMatch = 0;
 					for (unsigned int j = 0; j < pointsInControl; j++) {
@@ -777,15 +792,17 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 						}
 					}
 
-					std::vector<double> probOfSingleScans;
+					std::vector<double> probOfAllScans; // vector for probabilities of single scans in one measurement
+					// scan = a ray of a measurement
+					// measurement = one range finder measurement (e.g. 180 scans)
 
-					if (maxCntMatch > cntMatchThresh){
+					if (maxCntMatch > cntMatchThresh){ // if enough values in field of view
 
 						// Rating dan_tob
 						for (unsigned int s = 0; s < pointsInControl; s++) { // whole control set
-							// clip points outside of model frustum
 							if (maskControl[s]) { // if point is in field of view
 
+								// get angle and distance of control point
 								double angle = atan2((STemp)(1, s), (STemp)(0, s));
 								double distance = sqrt( ((STemp)(0, s)) * ((STemp)(0, s)) + ((STemp)(1, s)) * ((STemp)(1, s)) );
 
@@ -793,7 +810,8 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 								int idxMinAngleDiff;
 								double diff;
 
-								for(int i = 0; i < anglesModel.size(); i++){ // find right model point to control point
+								// find right model point to actual control point using angle difference
+								for(int i = 0; i < anglesModel.size(); i++){
 									diff = abs(angle - anglesModel[i]);
 									if ( diff < minAngleDiff ){ // find min angle
 										minAngleDiff = diff;
@@ -803,42 +821,54 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 
 								//cout <<  "min angle " << minAngleDiff << endl;
 
-
-								double probOfSingleScan;
-								probOfSingleScan = probabilityOfTwoSingleScans(distModel[idxMinAngleDiff], distance);
-								probOfSingleScans.push_back(probOfSingleScan);
+								double probOfActualScan;
+								probOfActualScan = probabilityOfTwoSingleScans(distModel[idxMinAngleDiff], distance, minAngleDiff);
+								probOfAllScans.push_back(probOfActualScan);
 
 								//cout << "angle model|scene: " << anglesModel[idxMinAngleDiff] * 180.0 / M_PI << " | " <<  angle * 180.0 / M_PI  <<
-								//		"; dist model|scene: " << distModel[idxMinAngleDiff] << " | " << distance << " prob: "<< probOfSingleScan << endl;
+								//		"; dist model|scene: " << distModel[idxMinAngleDiff] << " | " << distance << " prob: "<< probOfActualScan << endl;
 
 							}// if point is in field of view
 						} // whole control set
 
-						double probOfActualScan = 1;
 
-						for(int i = 0; i < probOfSingleScans.size(); i++){
-							probOfActualScan = probOfActualScan * probOfSingleScans[i];
+						// multiply all probabilities for probability of whole scan
+						double probOfActualMeasurement = 1;
+
+						for(int i = 0; i < probOfAllScans.size(); i++){
+							probOfActualMeasurement *= probOfAllScans[i];
 						}
 
-
-						if(probOfActualScan > bestErr){
+						// update T and bestProb if better than last iteration
+						if(probOfActualMeasurement > bestProb){
 							TBest = T;
-							bestErr = probOfActualScan;
+							bestProb = probOfActualMeasurement;
 							//cout << "new errSum: " << probOfActualScan << " trial: " << trial << endl;
 
-							if (_trace) {
-								//trace is only possible for single threaded execution
-								vector<unsigned int> idxM;
-								idxM.push_back(idx);
-								vector<unsigned int> idxS;
-								idxS.push_back(i);
-								_trace->addAssignment(M, idxM, S, idxS, &STemp, 10e100 * probOfActualScan,
-										trial);
-							}
+//							if (_trace) {
+//								//trace is only possible for single threaded execution
+//								vector<unsigned int> idxM;
+//								idxM.push_back(idx);
+//								vector<unsigned int> idxS;
+//								idxS.push_back(i);
+//								_trace->addAssignment(M, idxM, S, idxS, &STemp, 10e100 * probOfActualMeasurement,
+//										trial);
+//							}
 						}
-					}// if phiMax
+
+//						if (_trace) {
+//							//trace is only possible for single threaded execution
+//							vector<unsigned int> idxM;
+//							idxM.push_back(idx);
+//							vector<unsigned int> idxS;
+//							idxS.push_back(i);
+//							_trace->addAssignment(M, idxM, S, idxS, &STemp, 10e100 * probOfActualScan,
+//									trial);
+//						}
+
+					}// if cntMatch
 				} // if maskS
-			}
+			} // STRUCTAPPROACH ???
 		} // for i
 	} // for trials
 
@@ -860,12 +890,16 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 	return TBest;
 }
 
-double RandomNormalMatching::probabilityOfTwoSingleScans(double m, double s) {
+double RandomNormalMatching::probabilityOfTwoSingleScans(double m, double s, double phiDiff) {
+	// probability model vgl. Book: Probablistic Robotics
 
 	// hit
 	if (s < _rangemax) {
 		_phit = (1) / (sqrt(2 * M_PI * pow(_sighit, 2))) * pow(M_E, ((-0.5 * pow((m - s), 2)) / (pow(_sighit, 2)))) ;
 	}
+
+	// phi
+	_pphi = (1) / (sqrt(2 * M_PI * pow(_sigphi, 2))) * pow(M_E, ((-0.5 * pow(s, 2)) / (pow(_sigphi, 2)))) ;
 
 	// short
 	if (s < m){
@@ -883,7 +917,15 @@ double RandomNormalMatching::probabilityOfTwoSingleScans(double m, double s) {
 	_prand = 1 / _rangemax;
 	}
 
-	return _zhit * _phit + _zshort * _pshort + _zmax * _pmax + _zrand * _prand;
+	double ptemp = _zhit * _phit + _zshort * _pshort + _zmax * _pmax + _zrand * _prand;
+//	ptemp = ptemp * (1-_zphi) + _zphi * _pphi;
+//
+	if (phiDiff > ( (M_PI / 180.0) * 3.0) ){
+		return 0.5 * ptemp;
+	}else {
+		return ptemp;
+	}
+
 }
 
 

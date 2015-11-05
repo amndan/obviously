@@ -26,7 +26,7 @@ public:
    * @param phiMax maximum rotation
    * @param sizeControlSet approximate set of control set
    */
-  RandomNormalMatching(unsigned int trials = 50, double epsThresh = 0.15, unsigned int sizeControlSet = 180);
+  RandomNormalMatching(unsigned int trials = 90, double epsThresh = 0.15, unsigned int sizeControlSet = 90);
 
   /**
    * Destructor
@@ -85,8 +85,13 @@ public:
 						  const double transMax = 1.5,
 						  const double resolution = 0.0);
 
-
-	double probabilityOfTwoSingleScans(double m, double s);
+	/**
+	* get probability of two single rangefinder scans (of two rays)
+	* @param m distance of model point
+	* @param s distance of scene/control point
+	* @param phiDiff difference of the two angles
+	*/
+	double probabilityOfTwoSingleScans(double m, double s, double phiDiff);
 
   /**
    * Serialize assignment to trace folder
@@ -116,16 +121,21 @@ private:
 
   // probability model variables
   double _zhit;
+  double _zphi;
   double _zshort;
   double _zmax;
   double _zrand;
 
+  double _percentagePointsInC;
+
   double _phit;
+  double _pphi;
   double _pshort;
   double _pmax;
   double _prand;
 
   double _rangemax;
+  double _sigphi;
   double _sighit;
   double _lamshort;
 
