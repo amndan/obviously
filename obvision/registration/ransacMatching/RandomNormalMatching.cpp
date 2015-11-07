@@ -16,35 +16,40 @@ namespace obvious {
 #define USEKNN 1
 
 RandomNormalMatching::RandomNormalMatching(unsigned int trials,
-		double epsThresh, unsigned int sizeControlSet) {
+		double epsThresh, unsigned int sizeControlSet, double zhit, double zphi,
+		double zshort, double zmax, double zrand, double percentagePointsInC,
+		double rangemax, double sigphi, double sighit, double lamshort,
+		double maxAngleDiff, double maxAnglePenalty) {
+
 	_scaleDistance = 1.0 / (epsThresh * epsThresh);
 	_scaleOrientation = 0.33;
-	_trials = trials;
-	_sizeControlSet = sizeControlSet;
+
 	_model = NULL;
 	_index = NULL;
 	_trace = NULL;
 	_pcaSearchRange = 10;
 	_pcaMinSamples = 3;
 
+	_trials = trials;
+	_sizeControlSet = sizeControlSet;
+
 	_percentagePointsInC = 0.9; // how many percent of control set have to be in field of view
 
 	// probability parameters vgl. Book: Probabistic Robotics
-	_zhit = 0.45;
-	_zmax = 0.05;
-	_zshort = 0.25;
-	_zrand = 0.25;
-	_zphi = 0; // additional parameter for phi error; not used at the moment
-	_phit = 0;
-	_pphi = 0;
-	_pshort = 0;
-	_pmax = 0;
-	_prand = 0;
+	_zhit = zhit;
+	_zmax = zmax;
+	_zshort = zshort;
+	_zrand = zrand;
+	_zphi = zphi; // additional parameter for phi error; not used at the moment
 
-	_rangemax = 20;
-	_sighit = 0.2;
-	_sigphi = M_PI / 180.0; // additional parameter for phi error; not used at the moment
-	_lamshort = 0.08;
+
+	_rangemax = rangemax;
+	_sighit = sighit;
+	_sigphi = sigphi; // additional parameter for phi error; not used at the moment
+	_lamshort = lamshort;
+
+	_maxAngleDiff = maxAngleDiff;
+	_maxAnglePenalty = maxAnglePenalty;
 }
 
 RandomNormalMatching::~RandomNormalMatching() {
@@ -804,14 +809,14 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 
 								// get angle and distance of control point
 								double angle = atan2((STemp)(1, s), (STemp)(0, s));
-								double distance = sqrt( ((STemp)(0, s)) * ((STemp)(0, s)) + ((STemp)(1, s)) * ((STemp)(1, s)) );
+								double distance = sqrt( pow(((STemp)(0, s)), 2) + pow(((STemp)(1, s)), 2) );
 
 								double minAngleDiff = 2 * M_PI;
-								int idxMinAngleDiff;
+								int idxMinAngleDiff = 0;
 								double diff;
 
 								// find right model point to actual control point using angle difference
-								for(int i = 0; i < anglesModel.size(); i++){
+								for(unsigned int i = 0; i < anglesModel.size(); i++){
 									diff = abs(angle - anglesModel[i]);
 									if ( diff < minAngleDiff ){ // find min angle
 										minAngleDiff = diff;
@@ -835,8 +840,13 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 						// multiply all probabilities for probability of whole scan
 						double probOfActualMeasurement = 1;
 
-						for(int i = 0; i < probOfAllScans.size(); i++){
-							probOfActualMeasurement *= probOfAllScans[i];
+						if (probOfAllScans.size() == 0){
+							probOfActualMeasurement = 0;
+							cout << "probOfAllScans.size() == 0"  << endl;
+						}else {
+							for(unsigned int i = 0; i < probOfAllScans.size(); i++){
+								probOfActualMeasurement *= probOfAllScans[i];
+							}
 						}
 
 						// update T and bestProb if better than last iteration
@@ -893,36 +903,42 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 double RandomNormalMatching::probabilityOfTwoSingleScans(double m, double s, double phiDiff) {
 	// probability model vgl. Book: Probablistic Robotics
 
+	double phit = 0;
+	double pphi = 0;
+	double pshort = 0;
+	double pmax = 0;
+	double prand = 0;
+
 	// hit
 	if (s < _rangemax) {
-		_phit = (1) / (sqrt(2 * M_PI * pow(_sighit, 2))) * pow(M_E, ((-0.5 * pow((m - s), 2)) / (pow(_sighit, 2)))) ;
+		phit = (1) / (sqrt(2 * M_PI * pow(_sighit, 2))) * pow(M_E, ((-0.5 * pow((m - s), 2)) / (pow(_sighit, 2)))) ;
 	}
 
 	// phi
-	_pphi = (1) / (sqrt(2 * M_PI * pow(_sigphi, 2))) * pow(M_E, ((-0.5 * pow(s, 2)) / (pow(_sigphi, 2)))) ;
+	pphi = (1) / (sqrt(2 * M_PI * pow(_sigphi, 2))) * pow(M_E, ((-0.5 * pow(s, 2)) / (pow(_sigphi, 2)))) ;
 
 	// short
 	if (s < m){
 	double n = (1)/(1 - pow(M_E, (-_lamshort * m)));
-	_pshort = n * _lamshort * pow(M_E, (-_lamshort * s)) ;
+	pshort = n * _lamshort * pow(M_E, (-_lamshort * s)) ;
 	}
 
 	// max
 	if (s >= _rangemax){
-	_pmax = 1;
+	pmax = 1;
 	}
 
 	// rand
 	if (s < _rangemax){
-	_prand = 1 / _rangemax;
+	prand = 1 / _rangemax;
 	}
 
-	double ptemp = _zhit * _phit + _zshort * _pshort + _zmax * _pmax + _zrand * _prand;
+	double ptemp = _zhit * phit + _zshort * pshort + _zmax * pmax + _zrand * prand;
 //	ptemp = ptemp * (1-_zphi) + _zphi * _pphi;
 //
-	if (phiDiff > ( (M_PI / 180.0) * 3.0) ){
-		return 0.5 * ptemp;
-	}else {
+	if (phiDiff > ( (M_PI / 180.0) * _maxAngleDiff) ){
+		return _maxAnglePenalty * ptemp;
+	} else {
 		return ptemp;
 	}
 

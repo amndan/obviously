@@ -26,7 +26,23 @@ public:
    * @param phiMax maximum rotation
    * @param sizeControlSet approximate set of control set
    */
-  RandomNormalMatching(unsigned int trials = 90, double epsThresh = 0.15, unsigned int sizeControlSet = 90);
+
+	RandomNormalMatching(
+			unsigned int trials = 100,
+			double epsThresh = 0.15,
+			unsigned int sizeControlSet = 140,
+			double zhit = 0.45,
+			double zphi = 0.0,
+			double zshort = 0.25,
+			double zmax = 0.05,
+			double zrand = 0.25,
+			double percentagePointsInC = 0.9,
+			double rangemax = 20,
+			double sigphi = M_PI / 180.0 * 3,
+			double sighit = 0.2,
+			double lamshort = 0.08,
+			double maxAngleDiff = 3.0,
+			double maxAnglePenalty = 0.5);
 
   /**
    * Destructor
@@ -128,16 +144,13 @@ private:
 
   double _percentagePointsInC;
 
-  double _phit;
-  double _pphi;
-  double _pshort;
-  double _pmax;
-  double _prand;
-
   double _rangemax;
   double _sigphi;
   double _sighit;
   double _lamshort;
+
+  double _maxAngleDiff;
+  double _maxAnglePenalty;
 
   // squared distance threshold
   double _scaleDistance;
