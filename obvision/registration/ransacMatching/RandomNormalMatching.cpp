@@ -521,19 +521,29 @@ obvious::Matrix RandomNormalMatching::match(const obvious::Matrix* M,
 								bestCnt = cntMatch;
 								bestErr = errSum;
 								TBest = T;
+
+								if (_trace) {
+									//trace is only possible for single threaded execution
+									vector<unsigned int> idxM;
+									idxM.push_back(idx);
+									vector<unsigned int> idxS;
+									idxS.push_back(i);
+									_trace->addAssignment(M, idxM, S, idxS, &STemp,
+											errSum, trial);
+								}
 							}
 
 						}
 
-						if (_trace) {
-							//trace is only possible for single threaded execution
-							vector<unsigned int> idxM;
-							idxM.push_back(idx);
-							vector<unsigned int> idxS;
-							idxS.push_back(i);
-							_trace->addAssignment(M, idxM, S, idxS, &STemp,
-									errSum, trial);
-						}
+//						if (_trace) {
+//							//trace is only possible for single threaded execution
+//							vector<unsigned int> idxM;
+//							idxM.push_back(idx);
+//							vector<unsigned int> idxS;
+//							idxS.push_back(i);
+//							_trace->addAssignment(M, idxM, S, idxS, &STemp,
+//									errSum, trial);
+//						}
 
 					}                // if phiMax
 				} // if maskS
@@ -692,7 +702,6 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 	srand(time(NULL));
 
 	double bestRatio = 0.0;
-	unsigned int bestCnt = 0;
 	double bestProb = 0.0;
 
 #ifndef DEBUG
@@ -798,14 +807,15 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 					}
 
 					std::vector<double> probOfAllScans; // vector for probabilities of single scans in one measurement
+					int fieldOfViewCount = 0;
 					// scan = a ray of a measurement
 					// measurement = one range finder measurement (e.g. 180 scans)
 
-					if (maxCntMatch > cntMatchThresh){ // if enough values in field of view
+					if (1){//maxCntMatch > cntMatchThresh){ // if enough values in field of view
 
 						// Rating dan_tob
 						for (unsigned int s = 0; s < pointsInControl; s++) { // whole control set
-							if (maskControl[s]) { // if point is in field of view
+							if (1){ //maskControl[s]) { // if point is in field of view
 
 								// get angle and distance of control point
 								double angle = atan2((STemp)(1, s), (STemp)(0, s));
@@ -823,6 +833,12 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 										idxMinAngleDiff = i;
 									}
 								}
+
+								if (minAngleDiff < (M_PI / 180.0) * _maxAngleDiff){
+									fieldOfViewCount++;
+								}
+
+
 
 								//cout <<  "min angle " << minAngleDiff << endl;
 
@@ -850,20 +866,20 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 						}
 
 						// update T and bestProb if better than last iteration
-						if(probOfActualMeasurement > bestProb){
+						if(probOfActualMeasurement > bestProb && fieldOfViewCount > pointsInControl * _percentagePointsInC){
 							TBest = T;
 							bestProb = probOfActualMeasurement;
 							//cout << "new errSum: " << probOfActualScan << " trial: " << trial << endl;
 
-//							if (_trace) {
-//								//trace is only possible for single threaded execution
-//								vector<unsigned int> idxM;
-//								idxM.push_back(idx);
-//								vector<unsigned int> idxS;
-//								idxS.push_back(i);
-//								_trace->addAssignment(M, idxM, S, idxS, &STemp, 10e100 * probOfActualMeasurement,
-//										trial);
-//							}
+							if (_trace) {
+								//trace is only possible for single threaded execution
+								vector<unsigned int> idxM;
+								idxM.push_back(idx);
+								vector<unsigned int> idxS;
+								idxS.push_back(i);
+								_trace->addAssignment(M, idxM, S, idxS, &STemp, 10e100 * probOfActualMeasurement,
+										trial);
+							}
 						}
 
 //						if (_trace) {
@@ -896,6 +912,7 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 	delete[] maskSpca;
 
 	delete Control;
+
 
 	return TBest;
 }
@@ -937,6 +954,7 @@ double RandomNormalMatching::probabilityOfTwoSingleScans(double m, double s, dou
 //	ptemp = ptemp * (1-_zphi) + _zphi * _pphi;
 //
 	if (phiDiff > ( (M_PI / 180.0) * _maxAngleDiff) ){
+		//return 1.0;
 		return _maxAnglePenalty * ptemp;
 	} else {
 		return ptemp;
