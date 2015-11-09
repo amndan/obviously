@@ -951,7 +951,11 @@ double RandomNormalMatching::probabilityOfTwoSingleScans(double m, double s, dou
 	}
 
 	double ptemp = _zhit * phit + _zshort * pshort + _zmax * pmax + _zrand * prand;
-//	ptemp = ptemp * (1-_zphi) + _zphi * _pphi;
+
+	if (ptemp == 0)
+		cout << "ptemp = 0" << endl;
+
+	//	ptemp = ptemp * (1-_zphi) + _zphi * _pphi;
 //
 	if (phiDiff > ( (M_PI / 180.0) * _maxAngleDiff) ){
 		//return 1.0;
