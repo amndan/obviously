@@ -33,7 +33,7 @@ RandomNormalMatching::RandomNormalMatching(unsigned int trials,
 	_trials = trials;
 	_sizeControlSet = sizeControlSet;
 
-	_percentagePointsInC = 0.9; // how many percent of control set have to be in field of view
+	_percentagePointsInC = percentagePointsInC; // how many percent of control set have to be in field of view
 
 	// probability parameters vgl. Book: Probabistic Robotics
 	_zhit = zhit;
@@ -865,8 +865,9 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 							}
 						}
 
+
 						// update T and bestProb if better than last iteration
-						if(probOfActualMeasurement > bestProb && fieldOfViewCount > pointsInControl * _percentagePointsInC){
+						if((probOfActualMeasurement > bestProb) && (fieldOfViewCount > pointsInControl * _percentagePointsInC)){
 							TBest = T;
 							bestProb = probOfActualMeasurement;
 							//cout << "new errSum: " << probOfActualScan << " trial: " << trial << endl;
@@ -893,6 +894,16 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 //						}
 
 					}// if cntMatch
+
+//					if (_trace) {
+//						//trace is only possible for single threaded execution
+//						vector<unsigned int> idxM;
+//						idxM.push_back(idx);
+//						vector<unsigned int> idxS;
+//						idxS.push_back(i);
+//						_trace->addAssignment(M, idxM, S, idxS, &STemp, bestProb * 10e100,
+//								trial);
+//					}
 				} // if maskS
 			} // STRUCTAPPROACH ???
 		} // for i
@@ -950,19 +961,21 @@ double RandomNormalMatching::probabilityOfTwoSingleScans(double m, double s, dou
 	prand = 1 / _rangemax;
 	}
 
-	double ptemp = _zhit * phit + _zshort * pshort + _zmax * pmax + _zrand * prand;
+	double ptemp = _zhit * phit + _zshort * pshort + _zmax * pmax + _zrand * prand + _zphi * pphi;
 
 	if (ptemp == 0)
 		cout << "ptemp = 0" << endl;
 
 	//	ptemp = ptemp * (1-_zphi) + _zphi * _pphi;
 //
-	if (phiDiff > ( (M_PI / 180.0) * _maxAngleDiff) ){
-		//return 1.0;
-		return _maxAnglePenalty * ptemp;
-	} else {
-		return ptemp;
-	}
+//	if (phiDiff > ( (M_PI / 180.0) * _maxAngleDiff) ){
+//		return 1.0;
+//		//return _maxAnglePenalty * ptemp;
+//	} else {
+//		return ptemp;
+//	}
+
+	return ptemp;
 
 }
 
