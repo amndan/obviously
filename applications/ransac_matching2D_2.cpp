@@ -37,26 +37,28 @@ int main(int argc, char** argv) {
 	string line;
 
 	cout << "open model file" << endl;
-	ifstream model("/home/amndan/Schreibtisch/maske/01/449_1420815145_10.4716_match2/rawData.dat");
+	ifstream model(
+			"/home/amndan/Schreibtisch/trace_diff_0.4/reihe6/01/769_1420815308_0.755271_match2/rawData.dat");
 	if (model.is_open()) {
 		while (getline(model, line)) {
 			//cout << line << '\n';
 			const char * cline = line.c_str();
 			x_m.push_back(std::strtod(cline, &sz));
 			y_m.push_back(std::strtod(sz + 1, &sz));
-			m_m.push_back((bool)std::strtod(sz + 1, &sz));
+			m_m.push_back((bool) std::strtod(sz + 1, &sz));
 			x_s.push_back(std::strtod(sz + 1, &sz));
 			y_s.push_back(std::strtod(sz + 1, &sz));
-			m_s.push_back((bool)std::strtod(sz + 1, &sz));
-			cout << "x: " << x_m[x_m.size()-1] << ", y: " << y_m[y_m.size()-1] << ", m: " << m_m[m_m.size()-1] << endl;
+			m_s.push_back((bool) std::strtod(sz + 1, &sz));
+//			cout << "x: " << x_m[x_m.size() - 1] << ", y: "
+//					<< y_m[y_m.size() - 1] << ", m: " << m_m[m_m.size() - 1]
+//					<< endl;
 		}
 		model.close();
 	} else
 		cout << "Unable to open file";
 
-	cout << x_s.size() << endl;
-	cout << x_m.size() << endl;
-
+//	cout << x_s.size() << endl;
+//	cout << x_m.size() << endl;
 
 	// Model coordinates
 	obvious::Matrix* M = new obvious::Matrix(x_m.size(), 2);
@@ -74,7 +76,7 @@ int main(int argc, char** argv) {
 		maskM[i] = m_m[i];
 		maskS[i] = m_s[i];
 
-		cout << "masks: " << "m: " << m_m[i] << " s: " << m_s[i] << endl;
+//		cout << "masks: " << "m: " << m_m[i] << " s: " << m_s[i] << endl;
 
 //		maskM[i] = true;
 //		maskS[i] = true;
@@ -109,24 +111,34 @@ int main(int argc, char** argv) {
 //  (*N)(DATASETSIZE-1, 0) = -((*M)(DATASETSIZE-1, 1) - (*M)(DATASETSIZE-2, 1));
 //  (*N)(DATASETSIZE-1, 1) = (*M)(DATASETSIZE-1, 0) - (*M)(DATASETSIZE-2, 0);
 
+//for(unsigned int i=0; i<S.getRows(); i++)
+//  cout << S(i, 0) << endl;
 
-	//for(unsigned int i=0; i<S.getRows(); i++)
-	//  cout << S(i, 0) << endl;
-
-
-
-	unsigned int trials = 20;
-	double epsThresh = 0.02;
-	unsigned int sizeControlSet = 100;
-
-
+	unsigned int trials = 180;
+	double epsThresh = 0.15;
+	unsigned int sizeControlSet = 180;
+	double zhit = 0.25;
+	double zphi = 0.25;
+	double zshort = 0;
+	double zmax = 0.25;
+	double zrand = 0.25;
+	double percentagePointsInC = 0.4;
+	double rangemax = 20;
+	double sigphi = M_PI / 180.0 * 3;
+	double sighit = 0.15;
+	double lamshort = 0.08;
+	double maxAngleDiff = 2.0;
+	double maxAnglePenalty = 0.5; // not used!
 
 	//RansacMatching matcher(trials, epsThresh, sizeControlSet);
-	 RandomNormalMatching matcher(trials, epsThresh, sizeControlSet);
-	  matcher.activateTrace();
+	RandomNormalMatching matcher(trials, epsThresh, sizeControlSet, zhit, zphi,
+			zshort, zmax, zrand, percentagePointsInC, rangemax, sigphi, sighit,
+			lamshort, maxAngleDiff, maxAnglePenalty);
+
+	matcher.activateTrace();
 
 	//Matrix F = matcher.match(M, maskM, &S, maskS, deg2rad(45.0), 1.5 , deg2rad(0.25));
-	Matrix F = matcher.match2(M, maskM, NULL, S, maskS, deg2rad(45.0), 1.5, deg2rad(0.25));
+	Matrix F = matcher.match2(M, maskM, NULL, S, maskS, deg2rad(45.0), 1.5, deg2rad(1));
 
 	matcher.serializeTrace("/tmp/trace2");
 
