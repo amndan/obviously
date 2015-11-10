@@ -97,7 +97,7 @@ int main(int argc, char** argv)
   matcher.activateTrace();
 
   //Matrix F = matcher.match(M, maskM, &S, maskS, deg2rad(45.0), 1.5 , deg2rad(0.25));
-  Matrix F = matcher.match2(M, maskM, NULL, &S, maskS, deg2rad(45.0), 1.5 , deg2rad(0.25));
+  Matrix F = matcher.match(M, maskM, NULL, &S, maskS, deg2rad(45.0), 1.5 , deg2rad(0.25));
 
   matcher.serializeTrace("/tmp/trace");
 

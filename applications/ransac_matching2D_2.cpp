@@ -28,37 +28,29 @@ int main(int argc, char** argv) {
 	char* sz;
 	std::vector<double> x_m;
 	std::vector<double> y_m;
+	std::vector<double> m_m;
 	std::vector<double> x_s;
 	std::vector<double> y_s;
+	std::vector<double> m_s;
 
 	//load data
 	string line;
 
 	cout << "open model file" << endl;
-	ifstream model("/tmp/trace/752_1420815195_0.376669_match2/model.dat");
+	ifstream model("/home/amndan/Schreibtisch/maske/01/449_1420815145_10.4716_match2/rawData.dat");
 	if (model.is_open()) {
 		while (getline(model, line)) {
 			//cout << line << '\n';
 			const char * cline = line.c_str();
 			x_m.push_back(std::strtod(cline, &sz));
-			y_m.push_back(std::strtod(sz + 1, NULL));
-			//cout << "x: " << x_m[x_m.size()-1] << ", y: " << y_m[y_m.size()-1] << endl;
+			y_m.push_back(std::strtod(sz + 1, &sz));
+			m_m.push_back((bool)std::strtod(sz + 1, &sz));
+			x_s.push_back(std::strtod(sz + 1, &sz));
+			y_s.push_back(std::strtod(sz + 1, &sz));
+			m_s.push_back((bool)std::strtod(sz + 1, &sz));
+			cout << "x: " << x_m[x_m.size()-1] << ", y: " << y_m[y_m.size()-1] << ", m: " << m_m[m_m.size()-1] << endl;
 		}
 		model.close();
-	} else
-		cout << "Unable to open file";
-
-	cout << "open scene file" << endl;
-	ifstream scene("/tmp/trace/752_1420815195_0.376669_match2/scene.dat");
-	if (scene.is_open()) {
-		while (getline(scene, line)) {
-			//cout << line << '\n';
-			const char * cline = line.c_str();
-			x_s.push_back(std::strtod(cline, &sz));
-			y_s.push_back(std::strtod(sz + 1, NULL));
-			//cout << "x: " << x_s[x_s.size()-1] << ", y: " << y_s[y_s.size()-1] << endl;
-		}
-		scene.close();
 	} else
 		cout << "Unable to open file";
 
@@ -76,16 +68,16 @@ int main(int argc, char** argv) {
 
 		(*M)(i, 0) = x_m[i];
 		(*M)(i, 1) = y_m[i];
-
-		maskM[i] = true;
-	}
-
-	for (unsigned int i = 0; i < x_s.size(); i++) {
-
 		(*S)(i, 0) = x_s[i];
 		(*S)(i, 1) = y_s[i];
 
-		maskS[i] = true;
+		maskM[i] = m_m[i];
+		maskS[i] = m_s[i];
+
+		cout << "masks: " << "m: " << m_m[i] << " s: " << m_s[i] << endl;
+
+//		maskM[i] = true;
+//		maskS[i] = true;
 	}
 
 	//Model Normals
@@ -134,8 +126,7 @@ int main(int argc, char** argv) {
 	  matcher.activateTrace();
 
 	//Matrix F = matcher.match(M, maskM, &S, maskS, deg2rad(45.0), 1.5 , deg2rad(0.25));
-	Matrix F = matcher.match2(M, maskM, NULL, S, maskS, deg2rad(45.0), 1.5,
-			deg2rad(0.25));
+	Matrix F = matcher.match2(M, maskM, NULL, S, maskS, deg2rad(45.0), 1.5, deg2rad(0.25));
 
 	matcher.serializeTrace("/tmp/trace2");
 
