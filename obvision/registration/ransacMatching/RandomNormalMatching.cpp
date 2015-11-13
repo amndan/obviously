@@ -14,6 +14,7 @@ namespace obvious {
 
 #define NORMALCONSENSUS 1
 #define USEKNN 1
+#define MATCH_SCENE_ON_MODEL 0
 
 RandomNormalMatching::RandomNormalMatching(unsigned int trials,
 		double epsThresh, unsigned int sizeControlSet, double zhit, double zphi,
@@ -720,15 +721,19 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 	bool* maskControl = new bool[pointsInC];
 	double* thetaControl = new double[pointsInC];
 
-	// ToDo: create angle array from model
+	std::vector<double> anglesArray;
+	std::vector<double> distArray;
 
-	std::vector<double> anglesModel;
-	std::vector<double> distModel;
+	// ToDo: create angle array from model
+#if MATCH_SCENE_ON_MODEL
 
 	for(unsigned int i = 0; i < idxMValid.size(); i++){
-		anglesModel.push_back(atan2((*M)(idxMValid[i], 1), (*M)(idxMValid[i], 0))); // store all available model angles
-		distModel.push_back( sqrt( pow(((*M)(idxMValid[i], 0)), 2) + pow(((*M)(idxMValid[i],1)), 2) ) ); // store distances to angles
+		anglesArray.push_back(atan2((*M)(idxMValid[i], 1), (*M)(idxMValid[i], 0))); // store all available model angles
+		distArray.push_back( sqrt( pow(((*M)(idxMValid[i], 0)), 2) + pow(((*M)(idxMValid[i],1)), 2) ) ); // store distances to angles
 	}
+
+#endif
+
 
 
 	for (unsigned int trial = 0; trial < trials; trial++) {
@@ -806,6 +811,19 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 						}
 					}
 
+#if MATCH_SCENE_ON_MODEL
+
+#else
+					anglesArray.clear();
+					distArray.clear();
+
+					for(unsigned int s = 0; s < pointsInControl; s++){
+						anglesArray.push_back(atan2(STemp(1, s), STemp(0, s))); // store all available model angles
+						distArray.push_back( sqrt( pow((STemp(0, s)), 2) + pow((STemp(1, s)), 2) ) ); // store distances to angles
+					}
+#endif
+
+
 					std::vector<double> probOfAllScans; // vector for probabilities of single scans in one measurement
 					int fieldOfViewCount = 0;
 					// scan = a ray of a measurement
@@ -813,26 +831,50 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 
 					if (1){//maxCntMatch > cntMatchThresh){ // if enough values in field of view
 
+
+
+
+#if MATCH_SCENE_ON_MODEL
 						// Rating dan_tob
 						for (unsigned int s = 0; s < pointsInControl; s++) { // whole control set
 							if (1){ //maskControl[s]) { // if point is in field of view
 
+								double minAngleDiff = 2 * M_PI;
+								int idxMinAngleDiff = 0;
+								double diff;
 								// get angle and distance of control point
 								double angle = atan2((STemp)(1, s), (STemp)(0, s));
 								double distance = sqrt( pow(((STemp)(0, s)), 2) + pow(((STemp)(1, s)), 2) );
 
-								double minAngleDiff = 2 * M_PI;
-								int idxMinAngleDiff = 0;
-								double diff;
-
 								// find right model point to actual control point using angle difference
-								for(unsigned int i = 0; i < anglesModel.size(); i++){
-									diff = abs(angle - anglesModel[i]);
+								for(unsigned int i = 0; i < anglesArray.size(); i++){
+									diff = abs(angle - anglesArray[i]);
 									if ( diff < minAngleDiff ){ // find min angle
 										minAngleDiff = diff;
 										idxMinAngleDiff = i;
 									}
 								}
+#else
+						// Rating dan_tob
+						for(unsigned int i = 0; i < idxMValid.size(); i++){ // whole scene
+							if (1){ //maskControl[s]) { // if point is in field of view
+
+								double minAngleDiff = 2 * M_PI;
+								int idxMinAngleDiff = 0;
+								double diff;
+								// get angle and distance of control point
+								double angle = atan2((*M)(idxMValid[i], 1), (*M)(idxMValid[i], 0));
+								double distance = sqrt( pow(((*M)(idxMValid[i], 0)), 2) + pow(((*M)(idxMValid[i],1)), 2) );
+
+								// find right scene point to actual model point using angle difference
+								for(unsigned int i = 0; i < anglesArray.size(); i++){
+									diff = abs(angle - anglesArray[i]);
+									if ( diff < minAngleDiff ){ // find min angle
+										minAngleDiff = diff;
+										idxMinAngleDiff = i;
+									}
+								}
+#endif
 
 								if (minAngleDiff < (M_PI / 180.0) * _maxAngleDiff){
 									fieldOfViewCount++;
@@ -843,11 +885,11 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 								//cout <<  "min angle " << minAngleDiff << endl;
 
 								double probOfActualScan;
-								probOfActualScan = probabilityOfTwoSingleScans(distModel[idxMinAngleDiff], distance, minAngleDiff);
+								probOfActualScan = probabilityOfTwoSingleScans(distArray[idxMinAngleDiff], distance, minAngleDiff);
 								probOfAllScans.push_back(probOfActualScan);
 
-								//cout << "angle model|scene: " << anglesModel[idxMinAngleDiff] * 180.0 / M_PI << " | " <<  angle * 180.0 / M_PI  <<
-								//		"; dist model|scene: " << distModel[idxMinAngleDiff] << " | " << distance << " prob: "<< probOfActualScan << endl;
+								//cout << "angle model|scene: " << anglesArray[idxMinAngleDiff] * 180.0 / M_PI << " | " <<  angle * 180.0 / M_PI  <<
+								//		"; dist model|scene: " << distArray[idxMinAngleDiff] << " | " << distance << " prob: "<< probOfActualScan << endl;
 
 							}// if point is in field of view
 						} // whole control set
