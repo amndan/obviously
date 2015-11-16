@@ -797,18 +797,6 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 //								trial);
 //					}
 
-#if MATCH_SCENE_ON_MODEL
-
-#else
-				  anglesArray.clear();
-				  distArray.clear();
-				  for(unsigned int s = 0; s < pointsInControl; s++){
-				    anglesArray.push_back(atan2((STemp)(1, s), (STemp)(0, s))); // store all available model angles
-				    distArray.push_back( sqrt( pow(((STemp)(0, s)), 2) + pow(((STemp)(1, s)), 2) ) ); // store distances to angles
-				  }
-#endif
-
-
 					// Determine number of control points in field of view
 					unsigned int maxCntMatch = 0;
 					for (unsigned int j = 0; j < pointsInControl; j++) {
@@ -843,36 +831,48 @@ obvious::Matrix RandomNormalMatching::match2(const obvious::Matrix* M,
 
 
 #if MATCH_SCENE_ON_MODEL
-            // Rating dan_tob
-            for (unsigned int s = 0; s < pointsInControl; s++) { // whole control set
-              if (1){ //maskControl[s]) { // if point is in field of view
+					// Rating dan_tob
+					for (unsigned int s = 0; s < pointsInControl; s++) { // whole control set
+					  if (1){ //maskControl[s]) { // if point is in field of view
 
-                // get angle and distance of control point
-                double angle = atan2((STemp)(1, s), (STemp)(0, s));
-                double distance = sqrt( pow(((STemp)(0, s)), 2) + pow(((STemp)(1, s)), 2) );
+						// get angle and distance of control point
+						double angle = atan2((STemp)(1, s), (STemp)(0, s));
+						double distance = sqrt( pow(((STemp)(0, s)), 2) + pow(((STemp)(1, s)), 2) );
 #else
-            // Rating dan_tob
-            for (unsigned int i = 0; i < idxMValid.size(); i++) { // whole control set
-              if (1){ //maskControl[s]) { // if point is in field of view
+					// Rating dan_tob
+					for (unsigned int i = 0; i < idxMValid.size(); i++) { // whole control set
+					  if (1){ //maskControl[s]) { // if point is in field of view
 
-                // get angle and distance of control point
-                double angle = atan2((*M)(idxMValid[i], 1), (*M)(idxMValid[i], 0));
-                double distance = sqrt( pow(((*M)(idxMValid[i], 0)), 2) + pow(((*M)(idxMValid[i],1)), 2) );
+						// get angle and distance of control point
+						double angle = atan2((*M)(idxMValid[i], 1), (*M)(idxMValid[i], 0));
+						double distance = sqrt( pow(((*M)(idxMValid[i], 0)), 2) + pow(((*M)(idxMValid[i],1)), 2) );
 #endif
 
+							double minAngleDiff = 2 * M_PI;
+							int idxMinAngleDiff = 0;
+							double diff;
 
-								if (minAngleDiff < (M_PI / 180.0) * _maxAngleDiff){
-									fieldOfViewCount++;
-								}
+							// find right model point to actual control point using angle difference
+							for(unsigned int i = 0; i < anglesArray.size(); i++){
+									diff = abs(angle - anglesArray[i]);
+									if ( diff < minAngleDiff ){ // find min angle
+											minAngleDiff = diff;
+											idxMinAngleDiff = i;
+									}
+							}
 
-								//cout <<  "min angle " << minAngleDiff << endl;
+							if (minAngleDiff < (M_PI / 180.0) * _maxAngleDiff){
+								fieldOfViewCount++;
+							}
 
-								double probOfActualScan;
-								probOfActualScan = probabilityOfTwoSingleScans(distArray[idxMinAngleDiff], distance, minAngleDiff);
-								probOfAllScans.push_back(probOfActualScan);
+							//cout <<  "min angle " << minAngleDiff << endl;
 
-								//cout << "angle model|scene: " << anglesArray[idxMinAngleDiff] * 180.0 / M_PI << " | " <<  angle * 180.0 / M_PI  <<
-								//		"; dist model|scene: " << distArray[idxMinAngleDiff] << " | " << distance << " prob: "<< probOfActualScan << endl;
+							double probOfActualScan;
+							probOfActualScan = probabilityOfTwoSingleScans(distArray[idxMinAngleDiff], distance, minAngleDiff);
+							probOfAllScans.push_back(probOfActualScan);
+
+							//cout << "angle model|scene: " << anglesArray[idxMinAngleDiff] * 180.0 / M_PI << " | " <<  angle * 180.0 / M_PI  <<
+							//		"; dist model|scene: " << distArray[idxMinAngleDiff] << " | " << distance << " prob: "<< probOfActualScan << endl;
 
 							}// if point is in field of view
 						} // whole control set

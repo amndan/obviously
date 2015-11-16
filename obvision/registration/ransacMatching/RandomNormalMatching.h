@@ -8,8 +8,6 @@
 #include <cmath>
 #include "omp.h"
 
-#define MATCH_SCENE_ON_MODEL 1
-
 namespace obvious
 {
 
