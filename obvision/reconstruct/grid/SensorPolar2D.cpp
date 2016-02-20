@@ -13,6 +13,7 @@ SensorPolar2D::SensorPolar2D(unsigned int size, double angularRes, double phiMin
   _width = size;
   _height = 1;
   _size = size;
+  _force = false;
 
   _data = new double[_size];
   _mask = new bool[_size];

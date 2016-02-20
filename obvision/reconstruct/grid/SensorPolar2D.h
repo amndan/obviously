@@ -81,6 +81,9 @@ public:
    */
   double getPhiUpperBound(void) const { return _phiUpperBound; };
 
+  //danDebug
+  bool _force;
+
 private:
 
   double _angularRes;
