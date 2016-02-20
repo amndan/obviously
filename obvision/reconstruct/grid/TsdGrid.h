@@ -161,6 +161,7 @@ public:
    */
   void push(SensorPolar2D* sensor);
   void pushTree(SensorPolar2D* sensor);
+  void pushForce(SensorPolar2D* sensor);
 
   bool containsData();
 

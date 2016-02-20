@@ -121,6 +121,7 @@ public:
    * @param weight measurement weight
    */
   void addTsd(const unsigned int x, const unsigned int y, const obfloat sdf, const obfloat weight);
+  void addTsdForce(const unsigned int x, const unsigned int y, const obfloat sdf, const obfloat weight);
 
   /**
    * Increase emptiness of whole partition, i.e., every measurement ray passes through partition
@@ -208,6 +209,21 @@ inline void TsdGridPartition::addTsd(const unsigned int x, const unsigned int y,
       cell->tsd   = (cell->tsd * cell->weight + tsd * w) / (cell->weight + w);
       cell->weight = min(cell->weight+w, TSDGRIDMAXWEIGHT);
     }
+  }
+}
+
+inline void TsdGridPartition::addTsdForce(const unsigned int x, const unsigned int y, const obfloat sd, const obfloat weight)
+{
+  // Factor avoids thin objects to be removed when seen from two sides
+  // Todo: Find better solution
+  if(sd >= -_maxTruncation)
+  {
+    TsdCell* cell = &_grid[y][x];
+
+    obfloat tsd = min(sd * _invMaxTruncation, TSDINC);
+
+    cell->tsd = tsd;
+    cell->weight = TSDGRIDMAXWEIGHT;
   }
 }
 
