@@ -164,7 +164,7 @@ private:
 
   obfloat _invMaxTruncation;
 
-  obfloat _eps;
+  obfloat _eps; // todo: comment
 
 };
 
@@ -192,21 +192,21 @@ inline void TsdGridPartition::addTsd(const unsigned int x, const unsigned int y,
 
     // Experimental: Increase weight for cells close to the surface
     // If we see a thin surface from both sides, this might prevent temporal removement
-    obfloat w = 0.01;
+    obfloat w = 0.01;  // todo: magic number
     if(fabs(sd)<_eps) w = 1.0;
     w *= weight;
 
-    if(isnan(cell->tsd))
+    if(isnan(cell->tsd))  // if cell is empty
     {
       cell->tsd = tsd;
-      cell->weight += w;
+      cell->weight += w;  // weight = 1.0
     }
     else
     {
       //cell->weight = min(cell->weight+TSDINC, TSDGRIDMAXWEIGHT);
       //cell->tsd   = (cell->tsd * (cell->weight - TSDINC) + tsd) / cell->weight;
 
-      cell->tsd   = (cell->tsd * cell->weight + tsd * w) / (cell->weight + w);
+      cell->tsd   = (cell->tsd * cell->weight + tsd * w) / (cell->weight + w);  // weight tsd
       cell->weight = min(cell->weight+w, TSDGRIDMAXWEIGHT);
     }
   }
