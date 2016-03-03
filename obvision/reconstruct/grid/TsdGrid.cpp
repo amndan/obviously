@@ -205,39 +205,40 @@ void TsdGrid::push(SensorPolar2D* sensor)
   {
     int* idx = new int[partSize];
 #pragma omp for schedule(dynamic)
-    for(unsigned int i=0; i<(unsigned int)(_partitionsInX*_partitionsInY); i++)
+    for(unsigned int i=0; i<(unsigned int)(_partitionsInX*_partitionsInY); i++) // iterate whole grid
     {
-      TsdGridPartition* part = _partitions[0][i];
-      if(!part->isInRange(tr, sensor, _maxTruncation)) continue;
+      TsdGridPartition* part = _partitions[0][i]; // get current partition
+      if(!part->isInRange(tr, sensor, _maxTruncation)) continue;  // sensor is in range of partition
 
-      part->init(_maxTruncation);
+      part->init(_maxTruncation);   // init partition if not jet initialized
 
-      const obfloat* partCentroid = part->getCentroid();
-      obfloat distCentroid = sqrt((partCentroid[0]-tr[0])*(partCentroid[0]-tr[0])+(partCentroid[1]-tr[1])*(partCentroid[1]-tr[1]));
+      const obfloat* partCentroid = part->getCentroid();  // midle of partition
+      obfloat distCentroid = sqrt((partCentroid[0]-tr[0])*(partCentroid[0]-tr[0])
+          +(partCentroid[1]-tr[1])*(partCentroid[1]-tr[1]));     // dist from sensor to centroid
       if(distCentroid > sensor->getMaximumRange()) distCentroid = sensor->getMaximumRange();
       obfloat partWeight = (sensor->getMaximumRange()-distCentroid)/sensor->getMaximumRange();
-      partWeight *= partWeight;
+      partWeight *= partWeight; // weight good if sensor
 
       Matrix* partCoords = part->getPartitionCoords();
       Matrix* cellCoordsHom = part->getCellCoordsHom();
-      sensor->backProject(cellCoordsHom, idx);
-      const double lowReflectivityRange = sensor->getLowReflectivityRange();
+      sensor->backProject(cellCoordsHom, idx);    // project sensor into grid
+      const double lowReflectivityRange = sensor->getLowReflectivityRange();  // deactivated
 
-      for(unsigned int c=0; c<partSize; c++)
+      for(unsigned int c=0; c<partSize; c++)  // cells
       {
         // Index of laser beam
         const int index = idx[c];
 
-        if(index>=0)
+        if(index>=0) // if in phi range of laser todo: magic number
         {
           if(mask[index])
           {
-            if(!isinf(data[index]))
+            if(!isinf(data[index]))  // if laser range not inf
             {
               // calculate signed distance, i.e., measurement minus distance of current cell to sensor
               const double sd = data[index] - sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
 
-              part->addTsd((*partCoords)(c, 0), (*partCoords)(c, 1), sd, partWeight);
+              part->addTsd((*partCoords)(c, 0), (*partCoords)(c, 1), sd, partWeight); // push into tsd
             }
             else
             {
