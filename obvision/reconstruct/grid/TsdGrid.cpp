@@ -333,6 +333,7 @@ void TsdGrid::pushForceDelete(SensorPolar2D* sensor)
 {
 
   //TODO: RK: Not implemented yet
+  //TODO: Check fkt. freefootprint() at TSD-Grid
   Timer t;
   t.start();
   const double* data     = sensor->getRealMeasurementData();
