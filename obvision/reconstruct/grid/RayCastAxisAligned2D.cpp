@@ -51,7 +51,7 @@ void RayCastAxisAligned2D::calcCoords(TsdGrid* grid, obfloat* coords, obfloat* n
               if((tsd_prev > 0 && tsd < 0) || (tsd_prev < 0 && tsd > 0))
               {
                 //TODO: RK: Check here for jump
-                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 1))
+                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 0.3*grid->getMaxTruncation()))
                 {
 //                  cout << tsd << "/" << tsd_prev << "-" << grid->getMaxTruncation() << endl;
                   cout << "Jump1" << endl;
@@ -89,7 +89,7 @@ void RayCastAxisAligned2D::calcCoords(TsdGrid* grid, obfloat* coords, obfloat* n
               if((tsd_prev > 0 && tsd < 0) || (tsd_prev < 0 && tsd > 0))
               {
                 //TODO: RK: Check here for jump
-                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 1))
+                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 0.3*grid->getMaxTruncation()))
                 {
                   cout << "Jump2" << endl;
 
