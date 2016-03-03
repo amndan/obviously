@@ -1,4 +1,5 @@
 #include "RayCastAxisAligned2D.h"
+#include "obvision/reconstruct/grid/TsdGrid.h"
 
 namespace obvious {
 
@@ -21,7 +22,6 @@ void RayCastAxisAligned2D::calcCoords(TsdGrid* grid, obfloat* coords, obfloat* n
   unsigned int gridOffset = 0;
 
   *cnt = 0;
-
   for(unsigned int y=1; y<partitionsInY-1; y++)
   {
     for(unsigned int x=1; x<partitionsInX-1; x++)
@@ -50,12 +50,28 @@ void RayCastAxisAligned2D::calcCoords(TsdGrid* grid, obfloat* coords, obfloat* n
               // Check sign change
               if((tsd_prev > 0 && tsd < 0) || (tsd_prev < 0 && tsd > 0))
               {
-                interp = tsd_prev / (tsd_prev - tsd);
-                coords[(*cnt)]   = px*cellSize + cellSize * (interp-1.0) + (x * p->getWidth()) * cellSize;
-                coords[(*cnt)+1] = py*cellSize + (y * p->getHeight())* cellSize;
-                if(normals)
+                //TODO: RK: Check here for jump
+                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 1))
+                {
+//                  cout << tsd << "/" << tsd_prev << "-" << grid->getMaxTruncation() << endl;
+                  cout << "Jump1" << endl;
+//
+////                  interp = tsd_prev / (tsd_prev - tsd);
+////                  coords[(*cnt)]   = px*cellSize + (x * p->getWidth()) * cellSize;
+////                  coords[(*cnt)+1] = py*cellSize + cellSize * (interp-1.0) + (y * p->getHeight())* cellSize;
+////                  if(normals)
+////                  grid->interpolateNormal(coords, &(normals[*cnt]));
+                  (*cnt) += 2;
+                }
+                else
+                {
+                  interp = tsd_prev / (tsd_prev - tsd);
+                  coords[(*cnt)]   = px*cellSize + cellSize * (interp-1.0) + (x * p->getWidth()) * cellSize;
+                  coords[(*cnt)+1] = py*cellSize + (y * p->getHeight())* cellSize;
+                  if(normals)
                   grid->interpolateNormal(coords, &(normals[*cnt]));
-                (*cnt) += 2;
+                  (*cnt) += 2;
+                }
               }
               tsd_prev = tsd;
             }
@@ -72,12 +88,28 @@ void RayCastAxisAligned2D::calcCoords(TsdGrid* grid, obfloat* coords, obfloat* n
               // Check sign change
               if((tsd_prev > 0 && tsd < 0) || (tsd_prev < 0 && tsd > 0))
               {
-                interp = tsd_prev / (tsd_prev - tsd);
-                coords[(*cnt)]   = px*cellSize + (x * p->getWidth()) * cellSize;
-                coords[(*cnt)+1] = py*cellSize + cellSize * (interp-1.0) + (y * p->getHeight())* cellSize;
-                if(normals)
+                //TODO: RK: Check here for jump
+                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 1))
+                {
+                  cout << "Jump2" << endl;
+
+//                  interp = tsd_prev / (tsd_prev - tsd);
+//                  coords[(*cnt)]   = px*cellSize + (x * p->getWidth()) * cellSize;
+//                  coords[(*cnt)+1] = py*cellSize + cellSize * (interp-1.0) + (y * p->getHeight())* cellSize;
+//                  if(normals)
+//                  grid->interpolateNormal(coords, &(normals[*cnt]));
+                  (*cnt) += 2;
+
+                }
+                else
+                {
+                  interp = tsd_prev / (tsd_prev - tsd);
+                  coords[(*cnt)]   = px*cellSize + (x * p->getWidth()) * cellSize;
+                  coords[(*cnt)+1] = py*cellSize + cellSize * (interp-1.0) + (y * p->getHeight())* cellSize;
+                  if(normals)
                   grid->interpolateNormal(coords, &(normals[*cnt]));
-                (*cnt) += 2;
+                  (*cnt) += 2;
+                }
               }
               tsd_prev = tsd;
             }

@@ -82,7 +82,7 @@ public:
   double getPhiUpperBound(void) const { return _phiUpperBound; };
 
   //danDebug
-  bool _force;
+  int _force; // 0 = work normal, 1 = force input, 2 = force delete
 
 private:
 
