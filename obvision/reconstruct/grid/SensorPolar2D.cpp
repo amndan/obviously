@@ -13,13 +13,17 @@ SensorPolar2D::SensorPolar2D(unsigned int size, double angularRes, double phiMin
   _width = size;
   _height = 1;
   _size = size;
-  _force = 0;
+  _force = false;
 
   _data = new double[_size];
   _mask = new bool[_size];
-  for(unsigned int i=0; i<_size; i++)
-    _mask[i] = true;
+  _typeID = new int[_size];
 
+  for(unsigned int i=0; i<_size; i++)
+  {
+    _mask[i] = true;
+    _typeID[i] = 0;
+  }
   _angularRes = angularRes;
   _phiMin = phiMin;
 

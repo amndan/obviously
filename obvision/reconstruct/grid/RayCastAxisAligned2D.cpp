@@ -51,27 +51,27 @@ void RayCastAxisAligned2D::calcCoords(TsdGrid* grid, obfloat* coords, obfloat* n
               if((tsd_prev > 0 && tsd < 0) || (tsd_prev < 0 && tsd > 0))
               {
                 //TODO: RK: Check here for jump
-                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 0.3*grid->getMaxTruncation()))
-                {
+//               if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 0.3*grid->getMaxTruncation()))
+//                {
 //                  cout << tsd << "/" << tsd_prev << "-" << grid->getMaxTruncation() << endl;
-                  cout << "Jump1" << endl;
+//                 // cout << "Jump1" << endl;
 //
 ////                  interp = tsd_prev / (tsd_prev - tsd);
 ////                  coords[(*cnt)]   = px*cellSize + (x * p->getWidth()) * cellSize;
 ////                  coords[(*cnt)+1] = py*cellSize + cellSize * (interp-1.0) + (y * p->getHeight())* cellSize;
 ////                  if(normals)
 ////                  grid->interpolateNormal(coords, &(normals[*cnt]));
-                  (*cnt) += 2;
-                }
-                else
-                {
+//                 // (*cnt) += 2;
+//                }
+//                else
+//                {
                   interp = tsd_prev / (tsd_prev - tsd);
                   coords[(*cnt)]   = px*cellSize + cellSize * (interp-1.0) + (x * p->getWidth()) * cellSize;
                   coords[(*cnt)+1] = py*cellSize + (y * p->getHeight())* cellSize;
                   if(normals)
                   grid->interpolateNormal(coords, &(normals[*cnt]));
                   (*cnt) += 2;
-                }
+//                }
               }
               tsd_prev = tsd;
             }
@@ -89,27 +89,27 @@ void RayCastAxisAligned2D::calcCoords(TsdGrid* grid, obfloat* coords, obfloat* n
               if((tsd_prev > 0 && tsd < 0) || (tsd_prev < 0 && tsd > 0))
               {
                 //TODO: RK: Check here for jump
-                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 0.3*grid->getMaxTruncation()))
-                {
-                  cout << "Jump2" << endl;
-
-//                  interp = tsd_prev / (tsd_prev - tsd);
-//                  coords[(*cnt)]   = px*cellSize + (x * p->getWidth()) * cellSize;
-//                  coords[(*cnt)+1] = py*cellSize + cellSize * (interp-1.0) + (y * p->getHeight())* cellSize;
-//                  if(normals)
-//                  grid->interpolateNormal(coords, &(normals[*cnt]));
-                  (*cnt) += 2;
-
-                }
-                else
-                {
+//                if((tsd_prev < 0 && tsd > 0) && (tsd-tsd_prev >= 0.3*grid->getMaxTruncation()))
+//                {
+//                  //cout << "Jump2" << endl;
+//
+////                  interp = tsd_prev / (tsd_prev - tsd);
+////                  coords[(*cnt)]   = px*cellSize + (x * p->getWidth()) * cellSize;
+////                  coords[(*cnt)+1] = py*cellSize + cellSize * (interp-1.0) + (y * p->getHeight())* cellSize;
+////                  if(normals)
+////                  grid->interpolateNormal(coords, &(normals[*cnt]));
+//                  //(*cnt) += 2;
+//
+//                }
+//                else
+//                {
                   interp = tsd_prev / (tsd_prev - tsd);
                   coords[(*cnt)]   = px*cellSize + (x * p->getWidth()) * cellSize;
                   coords[(*cnt)+1] = py*cellSize + cellSize * (interp-1.0) + (y * p->getHeight())* cellSize;
                   if(normals)
                   grid->interpolateNormal(coords, &(normals[*cnt]));
                   (*cnt) += 2;
-                }
+//                }
               }
               tsd_prev = tsd;
             }

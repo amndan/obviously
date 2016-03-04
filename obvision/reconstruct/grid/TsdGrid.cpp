@@ -267,11 +267,12 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
   t.start();
   const double* data     = sensor->getRealMeasurementData();
   const bool* mask       = sensor->getRealMeasurementMask();
+  int* typeID            = sensor->getRealMeasurementTypeID();
+
   obfloat tr[2];
   sensor->getPosition(tr);
 
   unsigned int partSize = (_partitions[0][0])->getSize();
-
 #pragma omp parallel
   {
     int* idx = new int[partSize];
@@ -294,20 +295,40 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
       sensor->backProject(cellCoordsHom, idx);
       const double lowReflectivityRange = sensor->getLowReflectivityRange();
 
+      double point[2];
+
       for(unsigned int c=0; c<partSize; c++)
       {
         // Index of laser beam
         const int index = idx[c];
-
+        bool putIn;
         if(index>=0)
         {
           if(mask[index])
           {
             if(!isinf(data[index]))
             {
-              // calculate signed distance, i.e., measurement minus distance of current cell to sensor
-              const double sd = data[index] - sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
-              part->addTsdForce((*partCoords)(c, 0), (*partCoords)(c, 1), sd, partWeight);
+              /* Object type:
+              * 0: // scan
+              * 1: // mirror
+              * 2: // error_mirror
+              * 3: // transparent
+              * 4: // error_transparent
+              */
+              // Force in points on a mirror or glass
+              if((typeID[index] == 1) or (typeID[index] == 3))
+              {
+                // calculate signed distance, i.e., measurement minus distance of current cell to sensor
+                const double sd = data[index] - sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
+                part->addTsdForce((*partCoords)(c, 0), (*partCoords)(c, 1), sd, partWeight);
+              }
+              // Force delete error points
+              if((typeID[index] == 2) or (typeID[index] == 4))
+              {
+                point[0] = (*cellCoordsHom)(c,0);
+                point[1] = (*cellCoordsHom)(c,1);
+                putIn = freeFootprint(point, getMaxTruncation()/5,getMaxTruncation()/5);
+              }
             }
             else
             {
@@ -328,80 +349,6 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
 
   _initialPushAccomplished = true;
 }
-
-void TsdGrid::pushForceDelete(SensorPolar2D* sensor)
-{
-
-  //TODO: RK: Not implemented yet
-  //TODO: Check fkt. freefootprint() at TSD-Grid
-  Timer t;
-  t.start();
-  const double* data     = sensor->getRealMeasurementData();
-  const bool* mask       = sensor->getRealMeasurementMask();
-  obfloat tr[2];
-  sensor->getPosition(tr);
-
-  unsigned int partSize = (_partitions[0][0])->getSize();
-
-#pragma omp parallel
-  {
-    int* idx = new int[partSize];
-#pragma omp for schedule(dynamic)
-    for(unsigned int i=0; i<(unsigned int)(_partitionsInX*_partitionsInY); i++)
-    {
-      TsdGridPartition* part = _partitions[0][i];
-      if(!part->isInRange(tr, sensor, _maxTruncation)) continue;
-
-      part->init(_maxTruncation);
-
-      const obfloat* partCentroid = part->getCentroid();
-      obfloat distCentroid = sqrt((partCentroid[0]-tr[0])*(partCentroid[0]-tr[0])+(partCentroid[1]-tr[1])*(partCentroid[1]-tr[1]));
-      if(distCentroid > sensor->getMaximumRange()) distCentroid = sensor->getMaximumRange();
-      obfloat partWeight = (sensor->getMaximumRange()-distCentroid)/sensor->getMaximumRange();
-      partWeight *= partWeight;
-
-      Matrix* partCoords = part->getPartitionCoords();
-      Matrix* cellCoordsHom = part->getCellCoordsHom();
-      sensor->backProject(cellCoordsHom, idx);
-      const double lowReflectivityRange = sensor->getLowReflectivityRange();
-
-      for(unsigned int c=0; c<partSize; c++)
-      {
-        // Index of laser beam
-        const int index = idx[c];
-
-        if(index>=0)
-        {
-          if(mask[index])
-          {
-            if(!isinf(data[index]))
-            {
-              // calculate signed distance, i.e., measurement minus distance of current cell to sensor
-              const double sd = data[index] - sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
-              // RK: continiue here
-              part->deleteTsdForce((*partCoords)(c, 0), (*partCoords)(c, 1), 0, TSDGRIDMAXWEIGHT);
-            }
-            else
-            {
-              const double dist = sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
-              if(dist<lowReflectivityRange)
-                part->deleteTsdForce((*partCoords)(c, 0), (*partCoords)(c, 1), 0, TSDGRIDMAXWEIGHT);
-            }
-          }
-        }
-      }
-    }
-    delete [] idx;
-  }
-
-  propagateBorders();
-
-  LOGMSG(DBG_DEBUG, "Elapsed push: " << t.elapsed() << "s");
-
-  _initialPushAccomplished = true;
-}
-
-
 
 void TsdGrid::pushTree(SensorPolar2D* sensor)
 {
