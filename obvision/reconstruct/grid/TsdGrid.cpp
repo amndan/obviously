@@ -269,6 +269,9 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
   const bool* mask       = sensor->getRealMeasurementMask();
   int* typeID            = sensor->getRealMeasurementTypeID();
 
+//  double* points = new double[sensor->getRealMeasurementSize()*2];
+//  sensor->dataToCartesianVector(points);
+
   obfloat tr[2];
   sensor->getPosition(tr);
 
@@ -295,13 +298,13 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
       sensor->backProject(cellCoordsHom, idx);
       const double lowReflectivityRange = sensor->getLowReflectivityRange();
 
-      double point[2];
+      //double point[2];
 
       for(unsigned int c=0; c<partSize; c++)
       {
         // Index of laser beam
         const int index = idx[c];
-        bool putIn;
+
         if(index>=0)
         {
           if(mask[index])
@@ -325,9 +328,8 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
               // Force delete error points
               if((typeID[index] == 2) or (typeID[index] == 4))
               {
-                point[0] = (*cellCoordsHom)(c,0);
-                point[1] = (*cellCoordsHom)(c,1);
-                putIn = freeFootprint(point, getMaxTruncation()/5,getMaxTruncation()/5);
+                const double sd = data[index] - sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
+                part->deleteTsdForce((*partCoords)(c, 0), (*partCoords)(c, 1), sd, partWeight);
               }
             }
             else
@@ -342,6 +344,7 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
     }
     delete [] idx;
   }
+//  delete [] points;
 
   propagateBorders();
 

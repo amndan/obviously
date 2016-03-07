@@ -217,6 +217,7 @@ inline void TsdGridPartition::addTsdForce(const unsigned int x, const unsigned i
 {
   // Factor avoids thin objects to be removed when seen from two sides
   // Todo: Find better solution
+  // include the TSD-Function around the forced point
   if(sd >= -_maxTruncation)
   {
     TsdCell* cell = &_grid[y][x];
@@ -226,19 +227,30 @@ inline void TsdGridPartition::addTsdForce(const unsigned int x, const unsigned i
     cell->tsd = tsd;
     cell->weight = TSDGRIDMAXWEIGHT;
   }
+  // defines a unknown area behind the forced point => no second wall.
+  if((sd >= -(1.5*_maxTruncation)) and (sd <= -_maxTruncation))
+  {
+    TsdCell* cell = &_grid[y][x];
+
+    cell->tsd = NAN;
+    cell->weight = _initWeight;
+  }
 }
 
 inline void TsdGridPartition::deleteTsdForce(const unsigned int x, const unsigned int y, const obfloat sd, const obfloat weight)
 {
   // Factor avoids thin objects to be removed when seen from two sides
   // Todo: Find better solution
-  if(sd >= -_maxTruncation)
+  // erase the point and sets the area of the TSD-Function as unknown
+  if((sd >= -_maxTruncation) and (sd <= _maxTruncation))
   {
     TsdCell* cell = &_grid[y][x];
 
-    cell->tsd = 1.0;
-    cell->weight = TSDGRIDMAXWEIGHT;
+    cell->tsd = NAN;
+    cell->weight = _initWeight;
   }
+
+
 }
 
 inline obfloat TsdGridPartition::interpolateBilinear(int x, int y, obfloat dx, obfloat dy)
