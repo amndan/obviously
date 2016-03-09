@@ -260,7 +260,6 @@ void TsdGrid::push(SensorPolar2D* sensor)
   _initialPushAccomplished = true;
 }
 
-
 void TsdGrid::pushForceIn(SensorPolar2D* sensor)
 {
   Timer t;
