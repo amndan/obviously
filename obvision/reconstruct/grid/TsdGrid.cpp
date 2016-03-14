@@ -310,22 +310,22 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
           {
             if(!isinf(data[index]))
             {
+
               /* Object type:
               * 0: // scan
-              * 1: // mirror
-              * 2: // error_mirror
-              * 3: // transparent
-              * 4: // error_transparent
+              * 1: // mirror                  -> force in
+              * 2: // error_mirror            -> delete
+              * 3: // transparent             -> force in
+              * 4: // error_transparent       -> force in
               */
-              // Force in points on a mirror or glass
-              if((typeID[index] == 1) or (typeID[index] == 3))
+              if((typeID[index] == 1) or (typeID[index] == 3) or (typeID[index] == 4))
               {
                 // calculate signed distance, i.e., measurement minus distance of current cell to sensor
                 const double sd = data[index] - sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
                 part->addTsdForce((*partCoords)(c, 0), (*partCoords)(c, 1), sd, partWeight);
               }
               // Force delete error points
-              if((typeID[index] == 2) or (typeID[index] == 4))
+              if(typeID[index] == 2)
               {
                 const double sd = data[index] - sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
                 part->deleteTsdForce((*partCoords)(c, 0), (*partCoords)(c, 1), sd, partWeight);
