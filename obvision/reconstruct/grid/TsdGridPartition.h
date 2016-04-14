@@ -230,14 +230,15 @@ inline void TsdGridPartition::addTsd(const unsigned int x, const unsigned int y,
 //    }
 //  }
 
-  // new tsd function
+  // new tsd function 03/04/16
   if(sd >= -_maxTruncation)
     {
       TsdCell* cell = &_grid[y][x]; // cell is old value
 
-      //obfloat tsd = min(sd * _invMaxTruncation, TSDINC); // tsd is new value --> here increment is calculated
+      obfloat tsd = min(sd * _invMaxTruncation, TSDINC); // tsd is new value --> here increment is calculated
 
-      obfloat tsd = sdfToTsd(sd);
+      //new tsd function 03/04/16
+      //obfloat tsd = sdfToTsd(sd);
 
       /**
        *  The following weighting were proposed by:
@@ -298,24 +299,44 @@ inline void TsdGridPartition::addTsdForce(const unsigned int x, const unsigned i
 //    cell->weight = _initWeight;
 //  }
 
-  // new tsd function
-    if(sd >= -_maxTruncation)
-    {
-      TsdCell* cell = &_grid[y][x];
+  // new tsd function 03/04/16
+//    if(sd >= -_maxTruncation)
+//    {
+//      TsdCell* cell = &_grid[y][x];
+//
+//      obfloat tsd = sdfToTsd(sd);
+//
+//      cell->tsd = tsd;
+//      cell->weight = TSDGRIDMAXWEIGHT;
+//    }
+//    // defines a unknown area behind the forced point => no second wall.
+//    if((sd >= -(1.5*_maxTruncation)) and (sd <= -_maxTruncation))
+//    {
+//      TsdCell* cell = &_grid[y][x];
+//
+//      cell->tsd = 1;
+//      cell->weight = _initWeight;
+//    }
 
-      obfloat tsd = sdfToTsd(sd);
+    // new tsd function 04/11/16
+      if(sd >= -_maxTruncation)
+      {
+        TsdCell* cell = &_grid[y][x];
 
-      cell->tsd = tsd;
-      cell->weight = TSDGRIDMAXWEIGHT;
-    }
-    // defines a unknown area behind the forced point => no second wall.
-    if((sd >= -(1.5*_maxTruncation)) and (sd <= -_maxTruncation))
-    {
-      TsdCell* cell = &_grid[y][x];
+          obfloat tsd = min(sd * _invMaxTruncation, TSDINC); // tsd is new value --> here increment is calculated
 
-      cell->tsd = 1;
-      cell->weight = _initWeight;
-    }
+        cell->tsd = tsd;
+        cell->weight = TSDGRIDMAXWEIGHT;
+      }
+      // defines a unknown area behind the forced point => no second wall.
+      if((sd >= -(2*_maxTruncation)) and (sd < -_maxTruncation))
+      {
+        TsdCell* cell = &_grid[y][x];
+          obfloat tsd = min(sd * _invMaxTruncation, TSDINC); // tsd is new value --> here increment is calculated
+
+        cell->tsd = 1-tsd;
+        cell->weight = _initWeight;
+      }
 }
 
 inline void TsdGridPartition::deleteTsdForce(const unsigned int x, const unsigned int y, const obfloat sd, const obfloat weight)
