@@ -317,8 +317,9 @@ void TsdGrid::pushForceIn(SensorPolar2D* sensor)
               * 2: // error_mirror            -> delete
               * 3: // transparent             -> force in
               * 4: // error_transparent       -> force in
+              * 5: // error_mirror recalculated   -> force in
               */
-              if((typeID[index] == 1) or (typeID[index] == 3) or (typeID[index] == 4))
+              if((typeID[index] == 1) or (typeID[index] == 3) or (typeID[index] == 4) or (typeID[index] == 5))
               {
                 // calculate signed distance, i.e., measurement minus distance of current cell to sensor
                 const double sd = data[index] - sqrt( ((*cellCoordsHom)(c,0)-tr[0]) * ((*cellCoordsHom)(c,0)-tr[0]) + ((*cellCoordsHom)(c,1)-tr[1]) * ((*cellCoordsHom)(c,1)-tr[1]));
